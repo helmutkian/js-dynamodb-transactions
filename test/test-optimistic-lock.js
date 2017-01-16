@@ -1,6 +1,7 @@
 import uuid from 'uuid';
 import AWS from 'aws-sdk';
 import chai from 'chai';
+import ItemRef from '../dist/item-ref';
 import OptimisticLock from '../dist/optimistic-lock';
 
 const assert = chai.assert;
@@ -79,7 +80,7 @@ describe('OptimisticLock', () => {
 	it('should return the record', done => {
 	    const testItem = getTestItem();
 	    const Key = { id: testItem.id };
-	    const lock = new OptimisticLock(docClient, TableName, Key);
+	    const lock = new OptimisticLock(new ItemRef(docClient, TableName, Key));
 	    const deferred = Promise.defer();
 
 	    docClient.put({ TableName, Item: testItem })
@@ -97,7 +98,7 @@ describe('OptimisticLock', () => {
 	it('should successfully create the item', done => {
 	    const testItem = getTestItem();
 	    const Key = { id: testItem.id };	   
-	    const lock = new OptimisticLock(docClient, TableName, Key);
+	    const lock = new OptimisticLock(new ItemRef(docClient, TableName, Key));
 	    const newItem = { ...testItem, foo: 'baz' };
 	    
 	    lock.put({ Item: newItem })
@@ -112,8 +113,8 @@ describe('OptimisticLock', () => {
 	it('should fail to replace the item with a stale version', done => {
 	    const testItem = getTestItem();
 	    const Key = { id: testItem.id };
-	    const lockA = new OptimisticLock(docClient, TableName, Key);
-	    const lockB = new OptimisticLock(docClient, TableName, Key);
+	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
  	    const newItemA = { ...testItem, foo: 'baz' };
 	    const newItemB = { ...testItem, foo: 'quux' };
 
@@ -141,8 +142,8 @@ describe('OptimisticLock', () => {
 	it('should fail to replace with a stale version then succeed after refreshing the version', done => {
 	    const testItem = getTestItem();
 	    const Key = { id: testItem.id };
-	    const lockA = new OptimisticLock(docClient, TableName, Key);
-	    const lockB = new OptimisticLock(docClient, TableName, Key);
+	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
  	    const newItemA = { ...testItem, foo: 'baz' };
 	    const newItemB = { ...testItem, foo: 'quux' };
 
@@ -179,7 +180,7 @@ describe('OptimisticLock', () => {
 	it('should successfully delete the item', done => {
 	    const testItem = getTestItem();
 	    const Key = { id: testItem.id };
-	    const lock = new OptimisticLock(docClient, TableName, Key);
+	    const lock = new OptimisticLock(new ItemRef(docClient, TableName, Key));
 
 	    docClient.put({ TableName, Item: testItem })
 		.promise()
@@ -194,8 +195,8 @@ describe('OptimisticLock', () => {
 	it('should fail to delete the item with a stale lock', done => {
 	    const testItem = getTestItem();
 	    const Key = { id: testItem.id };
-	    const lockA = new OptimisticLock(docClient, TableName, Key);
-	    const lockB = new OptimisticLock(docClient, TableName, Key);
+	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
 
 	    Promise.all([
 		lockA.get(),
@@ -220,8 +221,8 @@ describe('OptimisticLock', () => {
 	it('should fail to delete with a stale version then succeed after refreshing the version', done => {
 	    const testItem = getTestItem();
 	    const Key = { id: testItem.id };
-	    const lockA = new OptimisticLock(docClient, TableName, Key);
-	    const lockB = new OptimisticLock(docClient, TableName, Key);
+	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
 
 	    Promise.all([
 		lockA.get(),

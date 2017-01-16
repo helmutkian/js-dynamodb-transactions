@@ -1,17 +1,22 @@
-import ItemRef from './item-ref';
+export default class OptimisticLock {
 
-export default class OptimisticLock extends ItemRef {
-
-    constructor(docClient, tableName, key) {
-	super(docClient, tableName, key);
-
+    constructor(itemRef) {
 	this._version = null;
 	
-	Object.defineProperty(this, 'version', {
-	    enumerable: true,
-	    configurable: false,
-	    get() {
-		return this._version;
+	Object.defineProperties(this, {
+	    version: {
+		enumerable: true,
+		configurable: false,
+		get() {
+		    return this._version;
+		}
+	    },
+	    itemRef: {
+		enumerable: true,
+		configurable: false,
+		get() {
+		    return itemRef;
+		}
 	    }
 	});
     }
@@ -19,7 +24,7 @@ export default class OptimisticLock extends ItemRef {
     get(params) {
 	const lock = this;
 	 
-	return super.get({
+	return lock.itemRef.get({
 	    ...(params || {}),
 	    ConsistentRead: true
 	})
@@ -41,7 +46,7 @@ export default class OptimisticLock extends ItemRef {
 		    ExpressionAttributeNames
 		} = generateCondition(params, lock.version);
 		
-		return super.update({
+		return lock.itemRef.update({
 		    ...(params || {}),
 		    UpdateExpression: 'SET #_version = :_next_version ' + (UpdateExpression || ''),
 		    ConditionExpression,
@@ -65,7 +70,7 @@ export default class OptimisticLock extends ItemRef {
 	    .then(() => {
 		const condition = generateCondition(params, lock.version);
 		
-		return super.put({
+		return lock.itemRef.put({
 		    ...(params || {}),
 		    ...condition,
 		    Item: {
@@ -87,7 +92,7 @@ export default class OptimisticLock extends ItemRef {
 	    .then(() => {
 		const condition = generateCondition(params, lock.version);
 		
-		return super.delete({
+		return lock.itemRef.delete({
 			...(params || {}),
 			...condition
 		});
