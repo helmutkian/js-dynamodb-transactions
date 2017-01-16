@@ -173,7 +173,99 @@ describe('OptimisticLock', () => {
     });
 
     describe('#update', () => {
-	// TODO
+	it('should successfully update the item', done => {
+	    const testItem = getTestItem();
+	    const Key = { id: testItem.id };
+	    const lock = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+
+	    docClient.put({ TableName, Item: testItem })
+		.promise()
+		.then(() => lock.update({
+		    UpdateExpression: 'SET foo = :foo',
+		    ExpressionAttributeValues: {
+			':foo': 'baz'
+		    },
+		    ReturnValues: 'ALL_NEW'
+		}))
+		.then(({ Attributes }) => {
+		    assert.deepEqual(Attributes, { ...testItem, foo: 'baz', _version: 1 });
+		    done();
+		})
+		.catch(done);
+	});
+
+	it('should fail to update the item with a stale lock', done => {
+	    const testItem = getTestItem();
+	    const Key = { id: testItem.id };
+	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+
+	    Promise.all([
+		lockA.get(),
+		lockB.get()
+	    ])
+	    .then(() => lockA.put({ Item: testItem }))
+	    .then(() => lockB.update({
+		UpdateExpression: 'SET foo = :foo',
+		ExpressionAttributeValues: {
+		    ':foo': 'baz'
+		}
+	    }))
+	    .then(() => {
+		assert.isOk(false);
+		done();
+	    })
+	    .catch(err => {
+		if (err.code === STALE_LOCK_ERR) {
+		    assert.isOk(true);
+		    done();
+		} else {
+		    done(err);
+		}
+	    });
+	});
+
+	it('should fail to update with a stale version then succeed after refreshing the version', done => {
+	    const testItem = getTestItem();
+	    const Key = { id: testItem.id };
+	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+
+	    Promise.all([
+		lockA.get(),
+		lockB.get()
+	    ])
+	    .then(() => lockA.put({ Item: testItem }))
+	    .then(() => lockB.update({
+		UpdateExpression: 'SET foo = :foo',
+		ExpressionAttributeValues: {
+		    ':foo': 'baz'
+		}
+	    }))
+	    .then(() => {
+		assert.isOk(false);
+		done();
+	    })
+	    .catch(err => {
+		if (err.code === STALE_LOCK_ERR) {
+		    lockB.get()
+		    	.then(() => lockB.update({
+			    UpdateExpression: 'SET foo = :foo',
+			    ExpressionAttributeValues: {
+				':foo': 'baz'
+			    },
+			    ReturnValues: 'ALL_NEW'
+			}))
+			.then(({ Attributes }) => {
+			    assert.deepEqual(Attributes, { ...testItem, foo: 'baz', _version: 2 });
+			    done();
+			})
+			.catch(done);
+		} else {
+		    done(err);
+		}
+	    }); 
+	});
     });
 
     describe('#delete', () => {

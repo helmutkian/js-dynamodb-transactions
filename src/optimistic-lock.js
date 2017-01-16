@@ -39,16 +39,20 @@ export default class OptimisticLock {
 	
 	return lock._ensureVersion(params)
 	    .then(() => {
-		const { UpdateExpression } = params || {};
  		const {
 		    ConditionExpression,
 		    ExpressionAttributeValues,
 		    ExpressionAttributeNames
 		} = generateCondition(params, lock.version);
+		const parsedUpdateExpression = parseUpdateExpression(params.UpdateExpression || '');
+		const UpdateExpression = stringifyUpdateExpression({
+		    ...parsedUpdateExpression,
+		    SET: '#_version = :_next_version' + (parsedUpdateExpression.SET ? ', ' +  parsedUpdateExpression.SET : '')
+		});
 		
 		return lock.itemRef.update({
 		    ...(params || {}),
-		    UpdateExpression: 'SET #_version = :_next_version ' + (UpdateExpression || ''),
+		    UpdateExpression,
 		    ConditionExpression,
 		    ExpressionAttributeNames,
 		    ExpressionAttributeValues: {
@@ -131,4 +135,37 @@ function generateCondition(params, version) {
 	    '#_version': '_version'
 	}
     };
+}
+
+function parseUpdateExpression(updateExpression) {
+    return updateExpression.split(/\s+/)
+	.reduce(({ topic, topics }, token) => {
+	    const index = ['SET', 'ADD', 'REMOVE', 'DELETE'].indexOf(token.toUpperCase());
+
+	    if (index >= 0) {
+		return {
+		    topic: token,
+		    topics
+		};
+	    } else {
+		const str = topics[topic];
+		const prefix = str ? str + ' ' : '';
+		
+		return {
+		    topic,
+		    topics: {
+			...topics,
+			[topic]: prefix + token
+		    }
+		};
+	    }
+	}, { topic: '', topics: {} })
+	.topics;
+}
+
+function stringifyUpdateExpression(parsedUpdateExpression) {
+    return Object.keys(parsedUpdateExpression)
+	.reduce((updateExpression, topic) => {
+	    return updateExpression + topic + ' ' + parsedUpdateExpression[topic];
+	}, '');
 }
