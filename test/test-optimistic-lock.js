@@ -177,7 +177,7 @@ describe('OptimisticLock', () => {
 		done,
 		lock =>
 		    lock.put({
-			Item: { foo: 'baz' },
+			Item: { foo: 'baz' }
 		    })
 		    .then(() => lock.get())
 		    .then(({ Item }) => ({ Attributes: Item })),
