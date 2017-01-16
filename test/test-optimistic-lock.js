@@ -36,6 +36,64 @@ function getTestItem() {
     };
 }
 
+function assertFailWithStaleLock(done, failingOperation) {
+    const testItem = getTestItem();
+    const Key = { id: testItem.id };
+    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+
+    Promise.all([
+	lockA.get(),
+	lockB.get()
+    ])
+    .then(() => lockA.put({ Item: testItem }))
+    .then(() => failingOperation(lockB))
+    .then(() => {
+	assert.isOk(false);
+	done();
+    })
+    .catch(err => {
+	if (err.code === STALE_LOCK_ERR) {
+	    assert.isOk(true);
+	    done();
+	} else {
+	    done(err);
+	}
+    });
+}
+
+function assertFailThenSucceed(done, operation, getExpectedValue) {
+    const testItem = getTestItem();
+    const Key = { id: testItem.id };
+    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
+    
+    Promise.all([
+	lockA.get(),
+	lockB.get()
+    ])
+    .then(() => lockA.put({ Item: testItem }))
+    .then(() => operation(lockB))
+    .then(() => {
+	assert.isOk(false);
+	done();
+    })
+    .catch(err => {
+	if (err.code === STALE_LOCK_ERR) {
+	    lockB.get()
+		.then(() => operation(lockB))
+		.then(({ Attributes }) => {
+		    const expected = getExpectedValue(testItem);
+		    assert.deepEqual(Attributes, expected);
+		    done();
+		})
+		.catch(done);
+	} else {
+	    done(err);
+	}
+    }); 
+}
+
 describe('OptimisticLock', () => {
 
     before(function (done) {
@@ -111,64 +169,20 @@ describe('OptimisticLock', () => {
 	});
 
 	it('should fail to replace the item with a stale version', done => {
-	    const testItem = getTestItem();
-	    const Key = { id: testItem.id };
-	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
-	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
- 	    const newItemA = { ...testItem, foo: 'baz' };
-	    const newItemB = { ...testItem, foo: 'quux' };
-
-	    Promise.all([
-		lockA.get(),
-		lockB.get()
-	    ])
-		.then(() => lockA.put({ Item: newItemA }))
-		.then(() => lockB.put({ Item: newItemB }))
-		.then(() => {
-		    assert.isOk(false);
-		    done();
-		})
-		.catch(err => {
-		    if (err.code === STALE_LOCK_ERR) {
-			assert.isOk(true);
-			done();
-		    } else {
-			done(err);
-		    }
-		});
-	
+	    assertFailWithStaleLock(done, lock => lock.put({ Item: { foo: 'baz' } }));
 	});
 
 	it('should fail to replace with a stale version then succeed after refreshing the version', done => {
-	    const testItem = getTestItem();
-	    const Key = { id: testItem.id };
-	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
-	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
- 	    const newItemA = { ...testItem, foo: 'baz' };
-	    const newItemB = { ...testItem, foo: 'quux' };
-
-	    Promise.all([
-		lockA.get(),
-		lockB.get()
-	    ])
-	    .then(() => lockA.put({ Item: newItemA }))
-            .then(() => lockB.put({ Item: newItemB }))
-	    .then(() => {
-		assert.isOk(false);
-		done();
-	    })
-	    .catch(err => {
-		if (err.code === STALE_LOCK_ERR) {
-		    lockB.get()
-			.then(() => lockB.put({ Item: newItemB }))
-			.then(() => lockB.get())
-			.then(({ Item }) => assert.deepEqual(Item, { ...newItemB, _version: 2 }))
-			.then(() => done())
-			.catch(done);
-		} else {
-		    done(err);
-		}
-	    });
+	    assertFailThenSucceed(
+		done,
+		lock =>
+		    lock.put({
+			Item: { foo: 'baz' },
+		    })
+		    .then(() => lock.get())
+		    .then(({ Item }) => ({ Attributes: Item })),
+		testItem => ({ ...testItem, foo: 'baz', _version: 2 })
+	    );
 	});
     });
 
@@ -195,76 +209,26 @@ describe('OptimisticLock', () => {
 	});
 
 	it('should fail to update the item with a stale lock', done => {
-	    const testItem = getTestItem();
-	    const Key = { id: testItem.id };
-	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
-	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
-
-	    Promise.all([
-		lockA.get(),
-		lockB.get()
-	    ])
-	    .then(() => lockA.put({ Item: testItem }))
-	    .then(() => lockB.update({
+	    assertFailWithStaleLock(done, lock => lock.update({
 		UpdateExpression: 'SET foo = :foo',
 		ExpressionAttributeValues: {
 		    ':foo': 'baz'
 		}
-	    }))
-	    .then(() => {
-		assert.isOk(false);
-		done();
-	    })
-	    .catch(err => {
-		if (err.code === STALE_LOCK_ERR) {
-		    assert.isOk(true);
-		    done();
-		} else {
-		    done(err);
-		}
-	    });
+	    }));
 	});
 
 	it('should fail to update with a stale version then succeed after refreshing the version', done => {
-	    const testItem = getTestItem();
-	    const Key = { id: testItem.id };
-	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
-	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
-
-	    Promise.all([
-		lockA.get(),
-		lockB.get()
-	    ])
-	    .then(() => lockA.put({ Item: testItem }))
-	    .then(() => lockB.update({
-		UpdateExpression: 'SET foo = :foo',
-		ExpressionAttributeValues: {
-		    ':foo': 'baz'
-		}
-	    }))
-	    .then(() => {
-		assert.isOk(false);
-		done();
-	    })
-	    .catch(err => {
-		if (err.code === STALE_LOCK_ERR) {
-		    lockB.get()
-		    	.then(() => lockB.update({
-			    UpdateExpression: 'SET foo = :foo',
-			    ExpressionAttributeValues: {
-				':foo': 'baz'
-			    },
-			    ReturnValues: 'ALL_NEW'
-			}))
-			.then(({ Attributes }) => {
-			    assert.deepEqual(Attributes, { ...testItem, foo: 'baz', _version: 2 });
-			    done();
-			})
-			.catch(done);
-		} else {
-		    done(err);
-		}
-	    }); 
+	    assertFailThenSucceed(
+		done,
+		lock => lock.update({
+		    UpdateExpression: 'SET foo = :foo',
+		    ExpressionAttributeValues: {
+			':foo': 'baz'
+		    },
+		    ReturnValues: 'ALL_NEW'
+		}),
+		testItem => ({ ...testItem, foo: 'baz', _version: 2 })
+	    );
 	});
     });
 
@@ -285,61 +249,15 @@ describe('OptimisticLock', () => {
 	});
 
 	it('should fail to delete the item with a stale lock', done => {
-	    const testItem = getTestItem();
-	    const Key = { id: testItem.id };
-	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
-	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
-
-	    Promise.all([
-		lockA.get(),
-		lockB.get()
-	    ])
-	    .then(() => lockA.put({ Item: testItem }))
-	    .then(() => lockB.delete())
-	    .then(() => {
-		assert.isOk(false);
-		done();
-	    })
-	    .catch(err => {
-		if (err.code === STALE_LOCK_ERR) {
-		    assert.isOk(true);
-		    done();
-		} else {
-		    done(err);
-		}
-	    });
+	    assertFailWithStaleLock(done, lock => lock.delete());
 	});
 
 	it('should fail to delete with a stale version then succeed after refreshing the version', done => {
-	    const testItem = getTestItem();
-	    const Key = { id: testItem.id };
-	    const lockA = new OptimisticLock(new ItemRef(docClient, TableName, Key));
-	    const lockB = new OptimisticLock(new ItemRef(docClient, TableName, Key));
-
-	    Promise.all([
-		lockA.get(),
-		lockB.get()
-	    ])
-	    .then(() => lockA.put({ Item: testItem }))
-	    .then(() => lockB.delete())
-	    .then(() => {
-		assert.isOk(false);
-		done();
-	    })
-	    .catch(err => {
-		if (err.code === STALE_LOCK_ERR) {
-		    lockB.get()
-			.then(() => lockB.delete({ ReturnValues: 'ALL_OLD' }))
-			.then(({ Attributes }) => {
-			    assert.deepEqual(Attributes, { ...testItem, _version: 1 });
-			    done();
-			})
-			.catch(done);
-		} else {
-		    done(err);
-		}
-	    });
+	    assertFailThenSucceed(
+		done,
+		lock => lock.delete({ ReturnValues: 'ALL_OLD' }),
+		testItem => ({ ...testItem, _version: 1 })
+	    );
 	});
-
     });
 });
