@@ -35,15 +35,18 @@ export function stringifyUpdateExpression(parsedUpdateExpression) {
 }
 
 export function composeUpdateExpressions(...updateExpressions) {
-    const composedParsedUpdateExpressions =  updateExpressions
-	.map(updateExpression => parseUpdateExpression(updateExpression))
-	.reduce((acc, parsedUpdateExpression) => {
-	    return Object.keys(parsedUpdateExpression)
-		.reduce((acc, topic) => ({
-		    ...acc,
-		    [topic]: parsedUpdateExpression[topic] + (acc.topic ? ', ' + acc.topic : '')
-		}), acc);
-	}, {});
+    const composedParsedUpdateExpressions = updateExpressions
+	  .map(updateExpression => parseUpdateExpression(updateExpression))
+	  .reduce((acc, parsedUpdateExpression) => {
+	      const composedTopics = Object.keys(parsedUpdateExpression)
+		    .reduce((_acc, topic) => {
+			const expression = parsedUpdateExpression[topic] + (acc[topic] ? ', ' + acc[topic] : '');
+
+			return { ..._acc, [topic]: expression };
+		    }, {});
+
+	      return { ...acc, ...composedTopics };
+	  }, {});
 
     return stringifyUpdateExpression(composedParsedUpdateExpressions);
 }

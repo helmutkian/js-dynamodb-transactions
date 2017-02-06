@@ -159,10 +159,10 @@ export default class TransactionItem {
     _applyUpdate() {
 	const txItem = this;
 	const tx = txItem._tx;
-	const params = txItem.params;
+	const params = txItem.params || {};
 	const UpdateExpression = composeUpdateExpressions(
-	    params.UpdateExpression || '',
-	    'SET #_tx_is_applied = :tx_is_applied'
+	   params.UpdateExpression || '',
+	    'SET #_tx_is_applied = :_tx_is_applied'
 	);
 	const {
 	    ExpressionAttributeNames,
@@ -170,12 +170,18 @@ export default class TransactionItem {
 	} = defineExpressionAttributes({
 	    '_tx_is_applied': true
 	});
-	
+
 	return txItem._itemLock.update({
 	    ...(params || {}),
 	    UpdateExpression,
-	    ExpressionAttributeNames,
-	    ExpressionAttributeValues
+	    ExpressionAttributeNames: {
+		...(params.ExpressionAttributeNames || {}),
+		...ExpressionAttributeNames
+	    },
+	    ExpressionAttributeValues: {
+		...(params.ExpressionAttributeValues || {}),
+		...ExpressionAttributeValues
+	    }
 	});
     }
 
