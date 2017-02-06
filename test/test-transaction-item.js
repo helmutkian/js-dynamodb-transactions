@@ -139,18 +139,100 @@ describe('TransactionItem', () => {
     /*
     describe('#unlock', () => {
     });
+    */
 
+    
     describe('#apply', () => {
-	it('should apply the UPDATE and mark the record as applied', done => {
-	});
-
+	
 	it('should apply the PUT and mark the record as applied', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.PUT,
+		{ Item: { foo: 'foo' } }
+	    );
+
+	    txItem.lock()
+		.then(() => txItem.apply())
+		.then(() => itemRef.get())
+		.then(({ Item: { foo, _tx_id, _tx_is_applied } }) => {
+		    assert.deepEqual(
+			{ foo, _tx_id, _tx_is_applied },
+			{ foo: 'foo', _tx_id: tx.id, _tx_is_applied: true }
+		    );
+		    done();
+		})
+		.catch(done);
 	});
 
+	
+	it('should apply the UPDATE and mark the record as applied', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.UPDATE,
+		{
+		    UpdateExpression: 'SET foo = :foo',
+		    ExpressionAttributeValues: {
+			':foo': 'foo'
+		    }
+		}
+	    );
+
+	    txItem.lock()
+		.then(() => txItem.apply())
+		.then(() => itemRef.get())
+		.then(({ Item: { foo, _tx_id, _tx_is_applied } }) => {
+		    assert.deepEqual(
+			{ foo, _tx_id, _tx_is_applied },
+			{ foo: 'foo', _tx_id: tx.id, _tx_is_applied: true }
+		    );
+		    done();
+		})
+		.catch(done);
+
+	});
+
+	
 	it('should not apply the DELETE or mark it as applied', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.DELETE,
+		{}
+	    );
+
+	    itemRef.put()
+		.then(() => txItem.lock())
+		.then(() => txItem.apply())
+		.then(() => itemRef.get())
+		.then(({ Item }) => {
+		    if (!Item) {
+			assert.isOk(false);
+		    } else {
+			const { _tx_id, _tx_is_applied } = Item;
+
+			assert.deepEqual(
+			    { _tx_id, _tx_is_applied },
+			    { _tx_id: tx.id, _tx_is_applied: false }
+			);
+		    }
+		    done();
+		})
+		.catch(done);
 	});
     });
 
+    /*
     describe('#rollback', () => {
 	it('should delete the transient record', done => {
 	});
