@@ -96,20 +96,21 @@ export default class TransactionItem {
 	
 	return txItem._itemLock
 	    .update(params)
-	    .then(() => txItem._saveImage(tx, image, now));
+	    .then(() => txItem._saveImage(image, now));
     }
 
     lock() {
 	const txItem = this;
 	const tx = this._tx;
-
+	
 	return txItem._itemLock.get()
-	    .then(({ Item }) => {
-				
+	    .then(result => {
+		const { Item } = result;
+		
 		if (!Item) {
-		    return txItem._createTransientItem(tx);
+		    return txItem._createTransientItem();
 		} else if (!Item._tx_id) {
-		    return txItem._lockItem(tx, Item);
+		    return txItem._lockItem(Item);
 		} else if (Item._tx_id !== tx.id) {
 		    throw TX_ERROR.TX_LOCK_CONTENTION_ERROR ;
 		} else {

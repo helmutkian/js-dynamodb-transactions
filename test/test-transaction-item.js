@@ -78,6 +78,47 @@ describe('TransactionItem', () => {
 		.catch(done);
 	});
 
+	it('should save the image of a non-transient record', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.PUT,
+		{ Item: { foo: 'foo' } }
+	    );
+	    
+	    itemRef.put({ Item: { foo: 'bar' } })
+		.then(() => itemRef.get())
+		.then(expected =>
+		      txItem.lock()
+		        .then(() => expected)
+		)
+		.then(expected =>
+		      txItem._imageLock.get()
+		        .then(actual => ([actual, expected]))
+		)
+		.then(([{ Item: { tx_id, image_id, image } }, { Item: expectedItem }]) => {
+
+		    assert.deepEqual(
+			{
+			    tx_id,
+			    image_id,
+			    image
+			},
+			{
+			    tx_id: tx.id,
+			    image_id: txItem.id,
+			    image: expectedItem
+			}
+		    );
+		    done();
+		})
+		.catch(done);
+
+	});
+
 	
 	it('should create a transient record locked to the transaction', done => {
 	    const tx = createTx();
@@ -100,7 +141,7 @@ describe('TransactionItem', () => {
 	});
 
 	it('should detect lock contention if a record is locked to another transaction', done => {
-	    const tx1 = createTx();
+	    const tx1 = createTx();  
 	    const tx2 = createTx();
 	    const itemRef = createItemRef();
 	    const txItem1 = new TransactionItem(
