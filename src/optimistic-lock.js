@@ -166,6 +166,6 @@ function parseUpdateExpression(updateExpression) {
 function stringifyUpdateExpression(parsedUpdateExpression) {
     return Object.keys(parsedUpdateExpression)
 	.reduce((updateExpression, topic) => {
-	    return updateExpression + topic + ' ' + parsedUpdateExpression[topic];
+	    return (updateExpression ? updateExpression + ' ' : '') + topic + ' ' + parsedUpdateExpression[topic];
 	}, '');
 }
