@@ -177,11 +177,66 @@ describe('TransactionItem', () => {
 
     });
 
-    /*
+    
     describe('#unlock', () => {
-    });
-    */
+	it('should remove the lock on the record for a non-delete operation', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.PUT,
+		{ Item: { foo: 'foo' } }
+	    );
 
+	    itemRef.put()
+		.then(() => txItem.lock())
+		.then(() => txItem.unlock())
+		.then(() => itemRef.get())
+		.then(({ Item }) => {
+		    const {
+			_tx_id,
+			_tx_locked_at,
+			_tx_is_transient,
+			_tx_is_applied
+		    } = Item;
+		    const isUnlocked = [
+			_tx_id,
+			_tx_locked_at,
+			_tx_is_transient,
+			_tx_is_applied
+		    ].every(prop => !prop);
+
+		    assert.equal(isUnlocked, true);
+		    done();
+		})
+		.catch(done);
+	});
+
+	it('should delete a record for a delete operation', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.DELETE,
+		{}
+	    );
+
+	    itemRef.put()
+		.then(() => txItem.lock())
+		.then(() => txItem.unlock())
+		.then(() => itemRef.get())
+		.then(({ Item }) => {
+		    assert.isOk(!Item);
+		    done();
+		})
+		.catch(done);
+	});
+    });
+    
     
     describe('#apply', () => {
 	
@@ -273,18 +328,71 @@ describe('TransactionItem', () => {
 	});
     });
 
-    /*
+    
     describe('#rollback', () => {
 	it('should delete the transient record', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.PUT,
+		{ Item: { foo: 'foo' } }
+	    );
+
+	    txItem.lock()
+		.then(() => txItem.apply())
+		.then(() => txItem.rollback())
+		.then(() => itemRef.get())
+		.then(({ Item }) => {
+		    assert.isOk(!Item);
+		    done();
+		})
+		.catch(done);
 	});
+
 
 	it('should unlock if changes are unapplied', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.UPDATE,
+		{
+		    UpdateExpression: 'SET foo = :foo',
+		    ExpressionAttributeValues: {
+			':foo': 'foo'
+		    }
+		}
+	    );
+
+	    itemRef.put()
+		.then(() => txItem.lock())
+		.then(() => txItem.rollback())
+		.then(() => itemRef.get())
+		.then(({ Item }) => {
+		    const hasLockProps = [
+			Item._tx_id,
+			Item._tx_locked_at,
+			Item._tx_is_applied,
+			Item._tx_is_transient
+		    ].every(prop => !!prop);
+
+		    assert.isOk(!hasLockProps);
+		    done();		    
+		})
+		.catch(done);
 	});
 
+	/*
 	it('should restore previously saved image', done => {
 	});
+	 */
     });
-    */
+    
 });
 
 
