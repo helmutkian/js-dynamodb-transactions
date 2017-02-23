@@ -1,4 +1,5 @@
 import AWS from 'aws-sdk';
+import _ from 'lodash';
 import chai from 'chai';
 import uuid from 'uuid';
 import TransactionItem from '../dist/transaction-item';
@@ -387,10 +388,36 @@ describe('TransactionItem', () => {
 		.catch(done);
 	});
 
-	/*
+	
 	it('should restore previously saved image', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.UPDATE,
+		{
+		    UpdateExpression: 'SET foo = :foo',
+		    ExpressionAttributeValues: {
+			':foo': 'foo'
+		    }
+		}
+	    );
+
+	    itemRef.put({ Item: { foo: 'bar' } })
+		.then(() => itemRef.get())
+		.then(({ Item: expected }) => txItem.lock().then(() => expected))
+		.then(expected => txItem.apply().then(() => expected))
+		.then(expected => txItem.rollback().then(() => expected))
+		.then(expected => itemRef.get().then(({ Item: actual }) => ({ actual, expected })))
+		.then(({ actual, expected }) => {
+		    assert.deepEqual(_.omit(actual, ['_version']), expected);
+		    done();
+		})
+		.catch(done);
 	});
-	 */
+	 
     });
     
 });
