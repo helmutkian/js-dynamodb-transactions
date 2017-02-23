@@ -55,9 +55,25 @@ export default class TransactionItem {
 	    _tx_is_applied: false,
 	    _tx_locked_at: new Date().toISOString()
 	};
+	const keys = txItem._itemLock.itemRef.key;
+	const ConditionExpression = Object.keys(keys)
+		  .reduce(
+		      (acc, key) =>
+			  (acc ? acc + ' AND ' : '') + `attribute_not_exists(#${ key })`,
+		      ''
+		  );
+	const ExpressionAttributeNames = Object.keys(keys)
+		  .reduce(
+		      (acc, key) => ({ ...acc, [`#${ key }`]: key }),
+		      {}
+		  );
 	
 	return txItem._itemLock
-	    .put({ Item: transientItem })
+	    .put({
+		Item: transientItem,
+		ConditionExpression,
+		ExpressionAttributeNames
+	    })
 	    .then(() => txItem._isTransient = true);
     }
 
@@ -70,6 +86,10 @@ export default class TransactionItem {
 		Item: {
 		    image,
 		    created_at: timestamp
+		},
+		ConditionExpression: 'attribute_not_exists(#_tx_id)',
+		ExpressionAttributeNames: {
+		    '#_tx_id': '_tx_id'
 		}
 	    })
 	    .then(() => this._image = image);
