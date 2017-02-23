@@ -220,7 +220,7 @@ export default class TransactionItem {
 	    return txItem._imageLock.get()
 		.then(({ Item }) => {
 		    if (!Item || !Item.image) {
-			// TODO Handle error
+			throw TX_ERROR.TX_ROLLBACK_IMAGE_NOT_FOUND;
 		    }
 
 		    return txItem._itemLock.put({ Item: Item.image });
