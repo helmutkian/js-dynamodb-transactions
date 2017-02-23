@@ -19,6 +19,7 @@ export default class TransactionItem {
 
 	this._isTransient = false;
 	this._isApplied = false;
+	this._image = null;
 	
 	Object.defineProperties(this, {
 	    _tx: {
@@ -70,7 +71,8 @@ export default class TransactionItem {
 		    image,
 		    created_at: timestamp
 		}
-	    });
+	    })
+	    .then(() => this._image = image);
     }
 
     _lockItem(image) {
@@ -217,13 +219,17 @@ export default class TransactionItem {
 	} else if (!txItem._isApplied) {
 	    return txItem.unlock();
 	} else {
-	    return txItem._imageLock.get()
-		.then(({ Item }) => {
-		    if (!Item || !Item.image) {
+	    const imagePromise = txItem._image ?
+		  new Promise(resolve => resolve(txItem._image)) :
+		  txItem._imageLock.get().then(({ Item }) => Item && Item.image);
+	    
+	    return imagePromise
+		.then(image => {
+		    if (!image) {
 			throw TX_ERROR.TX_ROLLBACK_IMAGE_NOT_FOUND;
 		    }
 
-		    return txItem._itemLock.put({ Item: Item.image });
+		    return txItem._itemLock.put({ Item: image });
 		});
 	}
     }
