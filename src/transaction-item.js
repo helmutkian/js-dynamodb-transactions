@@ -19,6 +19,7 @@ export default class TransactionItem {
 
 	this._isTransient = false;
 	this._isApplied = false;
+	this._lockedAt = null;
 	this._image = null;
 	
 	Object.defineProperties(this, {
@@ -92,7 +93,7 @@ export default class TransactionItem {
 		    '#_tx_id': '_tx_id'
 		}
 	    })
-	    .then(() => this._image = image);
+	    .then(() => txItem._image = image);
     }
 
     _lockItem(image) {
@@ -116,7 +117,8 @@ export default class TransactionItem {
 
 	return txItem._itemLock
 	    .update(params)
-	    .then(() => txItem._saveImage(image, now));
+	    .then(() => txItem._saveImage(image, now))
+	    .then(() => txItem._lockedAt = now);
     }
 
     lock() {
@@ -172,7 +174,9 @@ export default class TransactionItem {
 	    Item: {
 		...Item,
 		_tx_id: tx.id,
-		_tx_is_applied: true
+		_tx_is_applied: true,
+		_tx_is_transient: txItem._isTransient,
+		_tx_locked_at: txItem._lockedAt
 	    }
 	});
     }
@@ -251,6 +255,20 @@ export default class TransactionItem {
 
 		    return txItem._itemLock.put({ Item: image });
 		});
+	}
+    }
+
+    load() {
+	const txItem = this;
+
+	if (txItem.operation !== TX_OP.DELETE) {
+	    return txItem._itemLock.get()
+		.then(({ Item: { _tx_is_applied, _tx_is_transient } }) => {
+		    txItem._isApplied = _tx_is_applied;
+		    txItem._isTransient = _tx_is_transient;
+		});
+	} else {
+	    return new Promise(resolve => resolve());
 	}
     }
 }
