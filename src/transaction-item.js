@@ -1,8 +1,6 @@
 import OptimisticLock from './optimistic-lock';
 import ItemRef from './item-ref';
 import {
-    parseUpdateExpression,
-    stringifyUpdateExpression,
     composeUpdateExpressions,
     defineExpressionAttributes,
     TX_OP,

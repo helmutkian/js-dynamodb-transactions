@@ -1,6 +1,6 @@
 const UPDATE_EXPRESSION_TOPICS = ['SET', 'ADD', 'REMOVE', 'DELETE'];
 
-export function parseUpdateExpression(updateExpression) {
+function parseUpdateExpression(updateExpression) {
     return updateExpression.split(/\s+/)
 	.reduce(({ topic, topics }, token) => {
 	    const index = UPDATE_EXPRESSION_TOPICS.indexOf(token.toUpperCase());
@@ -26,13 +26,14 @@ export function parseUpdateExpression(updateExpression) {
 	.topics;
 }
 
-export function stringifyUpdateExpression(parsedUpdateExpression) {
+
+function stringifyUpdateExpression(parsedUpdateExpression) {
     return Object.keys(parsedUpdateExpression)
-	.filter(key => (parsedUpdateExpression[key] || '').trim())
 	.reduce((updateExpression, topic) => {
-	    return updateExpression + topic + ' ' + parsedUpdateExpression[topic];
+	    return (updateExpression ? updateExpression + ' ' : '') + topic + ' ' + parsedUpdateExpression[topic];
 	}, '');
 }
+
 
 export function composeUpdateExpressions(...updateExpressions) {
     const composedParsedUpdateExpressions = updateExpressions
