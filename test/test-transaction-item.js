@@ -265,6 +265,41 @@ describe('TransactionItem', () => {
 		.catch(done);
 	});
 
+
+	it('should apply the PUT and preserve the transaction-specific attributes', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.PUT,
+		{ Item: { foo: 'foo' } }
+	    );
+
+	    txItem.lock()
+		.then(() => txItem.apply())
+		.then(() => itemRef.get())
+		.then(({ Item }) => {
+		    const txProps = [
+			'_tx_id',
+			'_tx_locked_at',
+			'_tx_is_transient',
+			'_tx_is_applied'
+		    ];
+		    const expected = {
+			_tx_id: tx.id,
+			_tx_locked_at: txItem._lockedAt,
+			_tx_is_transient: txItem._isTransient,
+			_tx_is_applied: txItem._isApplied
+		    };
+
+		    assert.deepEqual(_.pick(Item, txProps), expected);
+		    done();
+		})
+		.catch(done);
+	});
+
 	
 	it('should apply the UPDATE and mark the record as applied', done => {
 	    const tx = createTx();
@@ -419,7 +454,42 @@ describe('TransactionItem', () => {
 	});
 	 
     });
-    
+
+    describe('#load', () => {
+	it('should load existing transaction item', done => {
+	    const tx = createTx();
+	    const itemRef = createItemRef();
+	    const txItem1 = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.PUT,
+		{ Item: { foo: 'foo' } }
+	    );
+	    const txItem2 = new TransactionItem(
+		docClient,
+		tx,
+		itemRef,
+		TX_OP.PUT,
+		{ Item: { foo: 'foo' } }
+	    );
+
+	    txItem1.lock()
+		.then(() => txItem1.apply())
+		.then(() => txItem2.load())
+		.then(() => {
+		    assert.deepEqual(
+			_.pick(txItem2, ['_isApplied', '_isTransient']),
+			{
+			    _isApplied: true,
+			    _isTransient: true
+			}
+		    );
+		    done();
+		})
+		.catch(done);
+	});
+    });
 });
 
 
