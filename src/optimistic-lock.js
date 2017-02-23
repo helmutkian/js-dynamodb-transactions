@@ -1,3 +1,5 @@
+import { composeUpdateExpressions } from './util';
+
 export default class OptimisticLock {
 
     constructor(itemRef) {
@@ -44,12 +46,10 @@ export default class OptimisticLock {
 		    ExpressionAttributeValues,
 		    ExpressionAttributeNames
 		} = generateCondition(params, lock.version);
-		const parsedUpdateExpression = parseUpdateExpression(params.UpdateExpression || '');
-		const UpdateExpression = stringifyUpdateExpression({
-		    ...parsedUpdateExpression,
-		    SET: '#_version = :_next_version' + (parsedUpdateExpression.SET ? ', ' +  parsedUpdateExpression.SET : '')
-		});
-		
+		const UpdateExpression = composeUpdateExpressions(
+		    params.UpdateExpression || '',
+		    'SET #_version = :_next_version'
+		);
 		return lock.itemRef.update({
 		    ...(params || {}),
 		    UpdateExpression,
@@ -137,35 +137,3 @@ function generateCondition(params, version) {
     };
 }
 
-function parseUpdateExpression(updateExpression) {
-    return updateExpression.split(/\s+/)
-	.reduce(({ topic, topics }, token) => {
-	    const index = ['SET', 'ADD', 'REMOVE', 'DELETE'].indexOf(token.toUpperCase());
-
-	    if (index >= 0) {
-		return {
-		    topic: token,
-		    topics
-		};
-	    } else {
-		const str = topics[topic];
-		const prefix = str ? str + ' ' : '';
-		
-		return {
-		    topic,
-		    topics: {
-			...topics,
-			[topic]: prefix + token
-		    }
-		};
-	    }
-	}, { topic: '', topics: {} })
-	.topics;
-}
-
-function stringifyUpdateExpression(parsedUpdateExpression) {
-    return Object.keys(parsedUpdateExpression)
-	.reduce((updateExpression, topic) => {
-	    return (updateExpression ? updateExpression + ' ' : '') + topic + ' ' + parsedUpdateExpression[topic];
-	}, '');
-}
