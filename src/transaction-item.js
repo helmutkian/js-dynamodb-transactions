@@ -93,7 +93,7 @@ export default class TransactionItem {
 	    ExpressionAttributeNames,
 	    ExpressionAttributeValues
 	};
-	
+
 	return txItem._itemLock
 	    .update(params)
 	    .then(() => txItem._saveImage(image, now));
@@ -225,7 +225,7 @@ export default class TransactionItem {
 			// TODO Handle error
 		    }
 
-		    return txItem._itemLock.put(Item.image);
+		    return txItem._itemLock.put({ Item: Item.image });
 		});
 	}
     }
